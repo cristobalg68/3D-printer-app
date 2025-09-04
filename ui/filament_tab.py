@@ -35,14 +35,14 @@ class FilamentDialog(QDialog):
         self.e_material = QLineEdit()
         self.e_price = QDoubleSpinBox(); self.e_price.setDecimals(0); self.e_price.setMaximum(1e5)
         self.e_initial = QDoubleSpinBox(); self.e_initial.setDecimals(0); self.e_initial.setMaximum(1e4)
-        self.e_remaining = QDoubleSpinBox(); self.e_remaining.setDecimals(0); self.e_remaining.setMaximum(1e4)
+        self.e_remaining_effective = QDoubleSpinBox(); self.e_remaining_effective.setDecimals(0); self.e_remaining_effective.setMaximum(1e4)
 
         layout.addRow("Nombre*", self.e_name)
         layout.addRow("Color*", self.e_color)
         layout.addRow("Material*", self.e_material)
         layout.addRow("Precio*", self.e_price)
-        layout.addRow("g iniciales", self.e_initial)
-        layout.addRow("g restantes", self.e_remaining)
+        layout.addRow("Gramos iniciales", self.e_initial)
+        layout.addRow("Gramos restantes", self.e_remaining_effective)
 
         btns = QHBoxLayout()
         b_ok = QPushButton("Guardar")
@@ -61,7 +61,7 @@ class FilamentDialog(QDialog):
             self.e_material.setText(data.material)
             self.e_price.setValue(data.price)
             self.e_initial.setValue(data.initial_g or 1000)
-            self.e_remaining.setValue(data.remaining_g or 1000)
+            self.e_remaining_effective.setValue(data.remaining_g_effective or 1000)
 
     def get_values(self) -> dict:
         name = self.e_name.text().strip()
@@ -82,7 +82,8 @@ class FilamentDialog(QDialog):
             material=material,
             price=price,
             initial_g=int(self.e_initial.value()),
-            remaining_g=int(self.e_remaining.value())
+            remaining_g_effective=int(self.e_remaining_effective.value()),
+            remaining_g_projected=int(self.e_remaining_effective.value())
         )
 
 class FilamentTab(QWidget):
@@ -103,8 +104,8 @@ class FilamentTab(QWidget):
         controls.addWidget(b_del)
         layout.addLayout(controls)
 
-        self.table = QTableWidget(0, 7)
-        self.table.setHorizontalHeaderLabels(["ID","Nombre","Color","Material","Precio","g iniciales","g restantes"])
+        self.table = QTableWidget(0, 8)
+        self.table.setHorizontalHeaderLabels(["ID","Nombre","Color","Material","Precio","Gramos Iniciales","Gramos Restantes Efectivos", "Gramos Restantes Proyectados"])
         self.table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.header = self.table.horizontalHeader()
@@ -124,6 +125,20 @@ class FilamentTab(QWidget):
         if row < 0:
             return None
         return int(self.table.item(row, 0).text())
+    
+    def load_filaments(self):
+        self.table.setRowCount(0)
+        filaments = self.session.query(Filament).all()
+        self.table.setRowCount(len(filaments))
+        for r, it in enumerate(filaments):
+            self.table.setItem(r, 0, QTableWidgetItem(str(it.id)))
+            self.table.setItem(r, 1, QTableWidgetItem(it.name))
+            self.table.setItem(r, 2, QTableWidgetItem(it.color))
+            self.table.setItem(r, 3, QTableWidgetItem(it.material))
+            self.table.setItem(r, 4, QTableWidgetItem(f"{it.price}"))
+            self.table.setItem(r, 5, QTableWidgetItem(f"{it.initial_g}"))
+            self.table.setItem(r, 6, QTableWidgetItem(f"{it.remaining_g_effective}"))
+            self.table.setItem(r, 7, QTableWidgetItem(f"{it.remaining_g_projected}"))
 
     def refresh(self):
         text = (self.search.text() or "").lower()
@@ -140,7 +155,8 @@ class FilamentTab(QWidget):
             self.table.setItem(r, 3, QTableWidgetItem(it.material))
             self.table.setItem(r, 4, QTableWidgetItem(f"{it.price}"))
             self.table.setItem(r, 5, QTableWidgetItem(f"{it.initial_g}"))
-            self.table.setItem(r, 6, QTableWidgetItem(f"{it.remaining_g}"))
+            self.table.setItem(r, 6, QTableWidgetItem(f"{it.remaining_g_effective}"))
+            self.table.setItem(r, 7, QTableWidgetItem(f"{it.remaining_g_projected}"))
 
     def add_item(self):
         dlg = FilamentDialog(self)
