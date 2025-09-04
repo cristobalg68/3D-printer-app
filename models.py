@@ -12,7 +12,8 @@ class Filament(Base):
     material = Column(String(80), nullable=True)
     price = Column(Integer, nullable=False)
     initial_g = Column(Integer, nullable=False, default=1000)
-    remaining_g = Column(Integer, nullable=False, default=1000)
+    remaining_g_effective = Column(Integer, nullable=False, default=1000)
+    remaining_g_projected = Column(Integer, nullable=False, default=1000)
     
     print_job = relationship("PrintJob", back_populates="filament")
 
@@ -34,6 +35,7 @@ class Object3D(Base):
     name = Column(String(160), nullable=False)
     stl_path = Column(String(255), nullable=False)
     gcode_path = Column(String(255), nullable=False)
+    objects = Column(Integer, nullable=False, default=1)
     weight_grams = Column(Integer, nullable=False)
     print_time_hours = Column(Float, nullable=False)
     cost = Column(Integer, nullable=False, default=0)
