@@ -10,10 +10,15 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Gestor de Impresión 3D")
         self.resize(1000, 650)
 
+        self.filament_tab = FilamentTab()
+        self.queue_tab = QueueTab()
+
         tabs = QTabWidget()
-        tabs.addTab(FilamentTab(), "Filamentos")
+        tabs.addTab(self.filament_tab, "Filamentos")
         tabs.addTab(PrinterTab(), "Impresoras")
         tabs.addTab(ObjectsTab(), "Objetos")
-        tabs.addTab(QueueTab(), "Cola de impresión")
+        tabs.addTab(self.queue_tab, "Cola de impresión")
+
+        self.queue_tab.job_created.connect(self.filament_tab.load_filaments)
 
         self.setCentralWidget(tabs)

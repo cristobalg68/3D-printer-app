@@ -54,8 +54,8 @@ class ObjectsTab(QWidget):
         layout = QVBoxLayout()
 
         # Tabla de objetos
-        self.table = QTableWidget(0, 8)
-        self.table.setHorizontalHeaderLabels(["ID", "Nombre", "Ruta del Modelo", "Ruta del Gcode", "Peso (g)", "Tiempo de impresión (h)", "Costo", "Precio Sugerido"])
+        self.table = QTableWidget(0, 9)
+        self.table.setHorizontalHeaderLabels(["ID", "Nombre", "Ruta del Modelo", "Ruta del Gcode", "Objetos", "Peso (g)", "Tiempo de Impresión (h)", "Costo Unitario", "Precio Unitario Sugerido"])
         self.header = self.table.horizontalHeader()
         self.header.setSectionResizeMode(QHeaderView.Interactive)
         self.header.setSectionResizeMode(1, QHeaderView.Stretch)
@@ -68,11 +68,13 @@ class ObjectsTab(QWidget):
         self.name_input = QLineEdit()
         self.model_input = QLineEdit()
         self.gcode_input = QLineEdit()
+        self.objects_input = QDoubleSpinBox(); self.objects_input.setDecimals(0); self.objects_input.setMaximum(1e2)
         self.weight_input = QDoubleSpinBox(); self.weight_input.setDecimals(0); self.weight_input.setMaximum(1e4)
         self.time_input = QDoubleSpinBox(); self.time_input.setDecimals(2); self.time_input.setMaximum(1e3)
         form.addRow("Nombre:", self.name_input)
         form.addRow("Ruta del Modelo:", self.model_input)
         form.addRow("Ruta del Gcode:", self.gcode_input)
+        form.addRow("Objetos en el archivo:", self.objects_input)
         form.addRow("Peso (g):", self.weight_input)
         form.addRow("Tiempo de impresión (h):", self.time_input)
         layout.addLayout(form)
@@ -134,8 +136,9 @@ class ObjectsTab(QWidget):
         self.name_input.setText(self.table.item(row, 1).text())
         self.model_input.setText(self.table.item(row, 2).text())
         self.gcode_input.setText(self.table.item(row, 3).text())
-        self.weight_input.setValue(int(self.table.item(row, 4).text()))
-        self.time_input.setValue(float(self.table.item(row, 5).text()))
+        self.objects_input.setValue(int(self.table.item(row, 4).text()))
+        self.weight_input.setValue(int(self.table.item(row, 5).text()))
+        self.time_input.setValue(float(self.table.item(row, 6).text()))
 
     def load_form_from_selection(self, selected):
         row = selected[0].row()
@@ -144,12 +147,14 @@ class ObjectsTab(QWidget):
             "nombre": self.table.item(row, 1).text(),
             "model_path": self.table.item(row, 2).text(),
             "gcode_path": self.table.item(row, 3).text(),
-            "peso": int(self.table.item(row, 4).text()),
-            "tiempo": float(self.table.item(row, 5).text()),
+            "objetos": int(self.table.item(row, 4).text()),
+            "peso": int(self.table.item(row, 5).text()),
+            "tiempo": float(self.table.item(row, 6).text()),
         }
         self.name_input.setText(self.current_object_data["nombre"])
         self.model_input.setText(self.current_object_data["model_path"])
         self.gcode_input.setText(self.current_object_data["gcode_path"])
+        self.objects_input.setValue(self.current_object_data["objetos"])
         self.weight_input.setValue(self.current_object_data["peso"])
         self.time_input.setValue(self.current_object_data["tiempo"])
 
@@ -167,25 +172,24 @@ class ObjectsTab(QWidget):
             self.delete_btn.setEnabled(True)
 
     def add_object(self):
+
+        q = int(self.objects_input.value())
+
         obj = Object3D(
             name=self.name_input.text(),
             stl_path=self.model_input.text(),
             gcode_path=self.gcode_input.text(),
+            objects=q,
             weight_grams=int(self.weight_input.value()),
             print_time_hours=float(self.time_input.value())
         )
 
         costo_gramo, costo_kwh, costo_desgaste, profit_margin = self.get_cost_parameters_and_profit_margin()
-        obj.cost = (
-            obj.weight_grams * costo_gramo +
-            obj.print_time_hours * costo_kwh +
-            obj.print_time_hours * costo_desgaste
-        )
+        cost = int((obj.weight_grams * costo_gramo + obj.print_time_hours * costo_kwh + obj.print_time_hours * costo_desgaste) / q)
+        obj.cost = (cost)
 
-        obj.suggested_price = (obj.cost * ((profit_margin / 100.0) + 1))
-
-        print(obj.cost)
-        print(obj.suggested_price)
+        suggested_price = int(cost * ((profit_margin / 100.0) + 1))
+        obj.suggested_price = (suggested_price)
 
         self.session.add(obj)
         self.session.commit()
@@ -201,21 +205,23 @@ class ObjectsTab(QWidget):
             self.table.setItem(row_idx, 1, QTableWidgetItem(obj.name))
             self.table.setItem(row_idx, 2, QTableWidgetItem(obj.stl_path))
             self.table.setItem(row_idx, 3, QTableWidgetItem(obj.gcode_path))
-            self.table.setItem(row_idx, 4, QTableWidgetItem(str(obj.weight_grams)))
-            self.table.setItem(row_idx, 5, QTableWidgetItem(str(obj.print_time_hours)))
-            self.table.setItem(row_idx, 6, QTableWidgetItem(str(obj.cost)))
-            self.table.setItem(row_idx, 7, QTableWidgetItem(str(obj.suggested_price)))
+            self.table.setItem(row_idx, 4, QTableWidgetItem(str(obj.objects)))
+            self.table.setItem(row_idx, 5, QTableWidgetItem(str(obj.weight_grams)))
+            self.table.setItem(row_idx, 6, QTableWidgetItem(str(obj.print_time_hours)))
+            self.table.setItem(row_idx, 7, QTableWidgetItem(str(obj.cost)))
+            self.table.setItem(row_idx, 8, QTableWidgetItem(str(obj.suggested_price)))
 
     def update_object(self):
         new_data = {
             "nombre": self.name_input.text(),
             "model_path": self.model_input.text(),
             "gcode_path": self.gcode_input.text(),
+            "objetos": int(self.objects_input.value()),
             "peso": int(self.weight_input.value()),
             "tiempo": self.time_input.value()
         }
 
-        if (new_data["nombre"] == self.current_object_data["nombre"]) and (new_data["model_path"] == self.current_object_data["model_path"]) and (new_data["gcode_path"] == self.current_object_data["gcode_path"]) and (new_data["peso"] == self.current_object_data["peso"]) and (new_data["tiempo"] == self.current_object_data["tiempo"]):
+        if (new_data["nombre"] == self.current_object_data["nombre"]) and (new_data["model_path"] == self.current_object_data["model_path"]) and (new_data["gcode_path"] == self.current_object_data["gcode_path"]) and (new_data["objetos"] == self.current_object_data["objetos"]) and (new_data["peso"] == self.current_object_data["peso"]) and (new_data["tiempo"] == self.current_object_data["tiempo"]):
             QMessageBox.information(self, "Sin cambios", "No se han realizado modificaciones.")
             return
         
@@ -231,22 +237,25 @@ class ObjectsTab(QWidget):
 
             w = int(self.weight_input.value())
             h = float(self.time_input.value())
+            q = int(self.objects_input.value())
 
             obj.name = self.name_input.text()
             obj.stl_path = self.model_input.text()
             obj.gcode_path = self.gcode_input.text()
+            obj.objects = q
             obj.weight_grams = w
             obj.print_time_hours = h
 
             costo_gramo, costo_kwh, costo_desgaste, profit_margin = self.get_cost_parameters_and_profit_margin()
-            cost = (
-                w * costo_gramo +
+            cost = int(
+                (w * costo_gramo +
                 h * costo_kwh +
-                h * costo_desgaste
+                h * costo_desgaste) / q
             )
+            obj.cost = (cost)
 
-            obj.cost = cost
-            obj.suggested_price = (cost * profit_margin)
+            suggested_price = int(cost * ((profit_margin / 100.0) + 1))
+            obj.suggested_price = (suggested_price)
 
             self.session.commit()
             self.load_objects()
@@ -278,6 +287,7 @@ class ObjectsTab(QWidget):
         self.name_input.clear()
         self.model_input.clear()
         self.gcode_input.clear()
+        self.objects_input.setValue(0)
         self.weight_input.setValue(0)
         self.time_input.setValue(0.0)
 
